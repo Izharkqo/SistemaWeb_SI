@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ========================================
+    // REGLAS DE DESARROLLO (TEMPORALES)
+    // ========================================
+    // ADVERTENCIA: Estas reglas permiten acceso público
+    // Solo usar en desarrollo, NO en producción
+    
+    // Reglas para categorías (acceso público temporal)
+    match /categorias/{categoriaId} {
+      allow read, write: if true;
+    }
+    
+    // Reglas para marcas (acceso público temporal)
+    match /marcas/{marcaId} {
+      allow read, write: if true;
+    }
+    
+    // Reglas para productos (acceso público temporal)
+    match /productos/{productoId} {
+      allow read, write: if true;
+    }
+    
+    // Reglas para clientes (acceso público temporal)
+    match /clientes/{clienteId} {
+      allow read, write: if true;
+    }
+    
+    // Reglas para pedidos (acceso público temporal)
+    match /pedidos/{pedidoId} {
+      allow read, write: if true;
+    }
+    
+    // Reglas para detalle de pedidos (acceso público temporal)
+    match /detalle_pedidos/{detalleId} {
+      allow read, write: if true;
+    }
+    
+    // Bloquear cualquier otra colección
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

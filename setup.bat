@@ -65,7 +65,7 @@ echo ========================================
 echo.
 echo Credenciales de acceso:
 echo Email: admin@makro.com
-echo Password: makro123
+echo Password: admin123
 echo Operador: juan.operador@makro.com (operador123)
 echo Solo Lectura: ana.consulta@makro.com (consulta123)
 echo Supervisor 2: carlos.supervisor@makro.com (supervisor123)

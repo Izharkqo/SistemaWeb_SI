@@ -1,0 +1,298 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ========================================
+    // FUNCIONES HELPER
+    // ========================================
+    
+    // Verificar si el usuario está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Verificar si el usuario tiene un rol específico
+    function hasRole(role) {
+      return isAuthenticated() && request.auth.token.rol == role;
+    }
+    
+    // Verificar si el usuario tiene alguno de los roles especificados
+    function hasAnyRole(roles) {
+      return isAuthenticated() && request.auth.token.rol in roles;
+    }
+    
+    // Verificar si es el propietario del documento
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Validar que los campos requeridos existen
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    // Validar timestamps
+    function hasValidTimestamps() {
+      return request.resource.data.created_at is timestamp 
+        && request.resource.data.updated_at is timestamp;
+    }
+    
+    // ========================================
+    // REGLAS PARA CATEGORÍAS
+    // ========================================
+    
+    match /categorias/{categoriaId} {
+      // Lectura: Todos los usuarios autenticados
+      allow read: if isAuthenticated();
+      
+      // Creación: Solo administradores y supervisores
+      allow create: if hasAnyRole(['administrador', 'supervisor'])
+        && hasRequiredFields(['nombre', 'estado', 'created_at', 'updated_at'])
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() > 0
+        && request.resource.data.nombre.size() <= 100
+        && request.resource.data.estado is bool
+        && request.resource.data.productos_count is number
+        && request.resource.data.productos_count >= 0;
+      
+      // Actualización: Solo administradores y supervisores
+      allow update: if hasAnyRole(['administrador', 'supervisor'])
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() > 0
+        && request.resource.data.nombre.size() <= 100
+        && request.resource.data.estado is bool
+        && request.resource.data.updated_at is timestamp;
+      
+      // Eliminación: Solo administradores
+      allow delete: if hasRole('administrador');
+    }
+    
+    // ========================================
+    // REGLAS PARA MARCAS
+    // ========================================
+    
+    match /marcas/{marcaId} {
+      // Lectura: Todos los usuarios autenticados
+      allow read: if isAuthenticated();
+      
+      // Creación: Solo administradores y supervisores
+      allow create: if hasAnyRole(['administrador', 'supervisor'])
+        && hasRequiredFields(['nombre', 'estado', 'created_at', 'updated_at'])
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() > 0
+        && request.resource.data.nombre.size() <= 100
+        && request.resource.data.estado is bool
+        && request.resource.data.productos_count is number
+        && request.resource.data.productos_count >= 0;
+      
+      // Actualización: Solo administradores y supervisores
+      allow update: if hasAnyRole(['administrador', 'supervisor'])
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() > 0
+        && request.resource.data.nombre.size() <= 100
+        && request.resource.data.estado is bool
+        && request.resource.data.updated_at is timestamp;
+      
+      // Eliminación: Solo administradores
+      allow delete: if hasRole('administrador');
+    }
+    
+    // ========================================
+    // REGLAS PARA PRODUCTOS (Futuro)
+    // ========================================
+    
+    match /productos/{productoId} {
+      // Lectura: Todos los usuarios autenticados
+      allow read: if isAuthenticated();
+      
+      // Escritura: Solo administradores y supervisores
+      allow write: if hasAnyRole(['administrador', 'supervisor']);
+    }
+    
+    // ========================================
+    // REGLAS PARA CLIENTES
+    // ========================================
+    
+    match /clientes/{clienteId} {
+      // Lectura: Usuarios autenticados pueden ver todos los clientes
+      allow read: if isAuthenticated();
+      
+      // Los clientes pueden leer solo sus propios datos
+      allow read: if isOwner(clienteId);
+      
+      // Creación: Administradores, supervisores y el propio cliente
+      allow create: if hasAnyRole(['administrador', 'supervisor'])
+        || isOwner(clienteId);
+      
+      // Actualización: Administradores, supervisores y el propio cliente
+      allow update: if hasAnyRole(['administrador', 'supervisor'])
+        || isOwner(clienteId);
+      
+      // Eliminación: Solo administradores
+      allow delete: if hasRole('administrador');
+    }
+    
+    // ========================================
+    // REGLAS PARA PEDIDOS
+    // ========================================
+    
+    match /pedidos/{pedidoId} {
+      // Lectura: Usuarios autenticados
+      allow read: if isAuthenticated();
+      
+      // Los clientes pueden leer solo sus propios pedidos
+      allow read: if isAuthenticated() 
+        && request.auth.uid == resource.data.customer_id;
+      
+      // Creación: Administradores, supervisores y clientes (sus propios pedidos)
+      allow create: if hasAnyRole(['administrador', 'supervisor'])
+        || (isAuthenticated() && request.auth.uid == request.resource.data.customer_id);
+      
+      // Actualización: Solo administradores y supervisores
+      allow update: if hasAnyRole(['administrador', 'supervisor']);
+      
+      // Eliminación: Solo administradores
+      allow delete: if hasRole('administrador');
+    }
+    
+    // ========================================
+    // REGLAS PARA DETALLE DE PEDIDOS
+    // ========================================
+    
+    match /detalle_pedidos/{detalleId} {
+      // Lectura: Usuarios autenticados
+      allow read: if isAuthenticated();
+      
+      // Escritura: Solo administradores y supervisores
+      allow write: if hasAnyRole(['administrador', 'supervisor']);
+    }
+    
+    // ========================================
+    // REGLAS PARA USUARIOS ADMINISTRATIVOS
+    // ========================================
+    
+    match /usuarios/{usuarioId} {
+      // Lectura: Solo administradores
+      allow read: if hasRole('administrador');
+      
+      // Los usuarios pueden leer sus propios datos
+      allow read: if isOwner(usuarioId);
+      
+      // Escritura: Solo administradores
+      allow write: if hasRole('administrador');
+      
+      // Los usuarios pueden actualizar sus propios datos (excepto rol)
+      allow update: if isOwner(usuarioId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rol']);
+    }
+    
+    // ========================================
+    // REGLAS PARA SESIONES
+    // ========================================
+    
+    match /sesiones/{sesionId} {
+      // Lectura: Solo el propietario de la sesión
+      allow read: if isAuthenticated() 
+        && request.auth.uid == resource.data.customer_id;
+      
+      // Escritura: Solo el propietario de la sesión
+      allow write: if isAuthenticated() 
+        && request.auth.uid == request.resource.data.customer_id;
+      
+      // Administradores pueden gestionar todas las sesiones
+      allow read, write: if hasRole('administrador');
+    }
+    
+    // ========================================
+    // REGLAS PARA CONFIGURACIÓN DEL SISTEMA
+    // ========================================
+    
+    match /configuracion/{configId} {
+      // Lectura: Todos los usuarios autenticados
+      allow read: if isAuthenticated();
+      
+      // Escritura: Solo administradores
+      allow write: if hasRole('administrador');
+    }
+    
+    // ========================================
+    // REGLAS PARA LOGS Y AUDITORÍA
+    // ========================================
+    
+    match /logs/{logId} {
+      // Lectura: Solo administradores
+      allow read: if hasRole('administrador');
+      
+      // Creación: Todos los usuarios autenticados (para logging)
+      allow create: if isAuthenticated();
+      
+      // No se permite actualizar o eliminar logs
+      allow update, delete: if false;
+    }
+    
+    // ========================================
+    // REGLAS POR DEFECTO (DENEGAR TODO)
+    // ========================================
+    
+    // Cualquier otra colección no especificada está bloqueada
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// ========================================
+// REGLAS PARA FIREBASE STORAGE
+// ========================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Reglas para imágenes de productos
+    match /productos/{productId}/{allPaths=**} {
+      // Lectura: Usuarios autenticados
+      allow read: if request.auth != null;
+      
+      // Escritura: Solo administradores y supervisores
+      allow write: if request.auth != null 
+        && request.auth.token.rol in ['administrador', 'supervisor']
+        && request.resource.size < 5 * 1024 * 1024  // Máximo 5MB
+        && request.resource.contentType.matches('image/.*');  // Solo imágenes
+    }
+    
+    // Reglas para avatares de usuarios
+    match /usuarios/{userId}/{allPaths=**} {
+      // Lectura: Usuarios autenticados
+      allow read: if request.auth != null;
+      
+      // Los usuarios pueden subir sus propios avatares
+      allow write: if request.auth != null 
+        && request.auth.uid == userId
+        && request.resource.size < 2 * 1024 * 1024  // Máximo 2MB
+        && request.resource.contentType.matches('image/.*');  // Solo imágenes
+      
+      // Administradores pueden gestionar todos los avatares
+      allow write: if request.auth != null 
+        && request.auth.token.rol == 'administrador';
+    }
+    
+    // Reglas para documentos de clientes
+    match /clientes/{clienteId}/documentos/{allPaths=**} {
+      // Lectura: El cliente o administradores
+      allow read: if request.auth != null 
+        && (request.auth.uid == clienteId 
+            || request.auth.token.rol in ['administrador', 'supervisor']);
+      
+      // Escritura: El cliente o administradores
+      allow write: if request.auth != null 
+        && (request.auth.uid == clienteId 
+            || request.auth.token.rol in ['administrador', 'supervisor'])
+        && request.resource.size < 10 * 1024 * 1024;  // Máximo 10MB
+    }
+    
+    // Reglas por defecto (denegar todo)
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
